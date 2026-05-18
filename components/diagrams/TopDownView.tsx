@@ -77,20 +77,22 @@ export function TopDownView() {
         }}
       />
 
-      {/* Glide-slope fan — blue, narrower, from GS antenna offset above runway */}
+      {/* Glide-slope fan — blue, narrower, from GS antenna toward approaching
+          aircraft on the LEFT. Apex at the antenna (right edge of this box),
+          fans out to the left. */}
       <motion.div
         initial={{ opacity: 0, scaleX: 0 }}
         animate={inView ? { opacity: 1, scaleX: 1 } : {}}
         transition={{ duration: 1.2, delay: 1.0, ease: [0.32, 0.72, 0, 1] }}
-        className="absolute origin-left"
+        className="absolute origin-right"
         style={{
-          left: "21%",
+          left: "5%",
+          right: "78%",
           top: "30%",
-          width: "60%",
           height: "20%",
-          clipPath: "polygon(0% 50%, 100% 0%, 100% 100%)",
+          clipPath: "polygon(100% 50%, 0% 0%, 0% 100%)",
           background:
-            "linear-gradient(to right, rgba(59,139,212,0.25) 0%, rgba(59,139,212,0) 100%)",
+            "linear-gradient(to left, rgba(59,139,212,0.25) 0%, rgba(59,139,212,0) 100%)",
         }}
       />
 
@@ -113,12 +115,14 @@ export function TopDownView() {
             <span key={i} className="block h-[3px] bg-text-tertiary/55" />
           ))}
         </div>
-        {/* Runway designators */}
+        {/* Runway designators — aircraft approaches from the west (left), so
+            it crosses the RWY 09 threshold first. "09" goes on the left,
+            "27" on the right end. */}
         <span className="absolute left-5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-semibold text-text-tertiary">
-          27
+          09
         </span>
         <span className="absolute right-5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-semibold text-text-tertiary">
-          09
+          27
         </span>
         {/* Centerline dashes — inside the runway */}
         <div className="absolute inset-x-12 top-1/2 -translate-y-1/2 h-px bg-text-tertiary/55"
