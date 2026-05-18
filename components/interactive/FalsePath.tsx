@@ -4,10 +4,41 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
 /**
- * False glide path demonstrator. Toggle reveals the 9° and 15° ghost paths
- * that satisfy the same DDM condition. Animation plays an aircraft
- * intercepting from above and being captured by the 9° false path.
+ * False glide path demonstrator. Pure HTML + CSS + Framer Motion.
+ *
+ * Single antenna anchor. All paths (3° true + 9° false + 15° false) are
+ * rotated div lines that share the same origin point.
  */
+
+const ANTENNA = { left: 5, top: 88 } // % from top-left
+const ASPECT = 13 / 6 // container aspect-[13/6] (≈ 2.17:1)
+
+// Endpoint of each path (visual exaggeration, labelled as the real angle)
+const PATH_3_END = { left: 95, top: 75 }
+const PATH_9_END = { left: 95, top: 32 }
+const PATH_15_END = { left: 62, top: 4 }
+
+// Compute rotated-div geometry for a path from ANTENNA to `end`
+function pathGeometry(end: { left: number; top: number }) {
+  const dxPct = end.left - ANTENNA.left
+  const dyPct = end.top - ANTENNA.top
+  // dyPct is negative when going up (top decreases)
+  const dxRel = dxPct * ASPECT
+  const dyRel = dyPct
+  const angleDeg = Math.atan2(dyRel, dxRel) * (180 / Math.PI)
+  // Length in % of container width: sqrt(dxPct² + (dyPct / ASPECT)²)
+  const lenPct = Math.sqrt(dxPct * dxPct + (dyPct / ASPECT) * (dyPct / ASPECT))
+  return { angleDeg, lenPct }
+}
+
+// Position along a path at parameter t (0 = antenna, 1 = endpoint)
+function pointOnPath(end: { left: number; top: number }, t: number) {
+  return {
+    left: ANTENNA.left + t * (end.left - ANTENNA.left),
+    top: ANTENNA.top + t * (end.top - ANTENNA.top),
+  }
+}
+
 export function FalsePath() {
   const [showFalse, setShowFalse] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -29,111 +60,201 @@ export function FalsePath() {
     return () => cancelAnimationFrame(raf)
   }, [playing])
 
-  // Aircraft path: starts top-left (above 9°), descends, gets captured by 9°.
-  // Pre-computed visual slopes (rounded so SSR matches client).
-  const tan3 = 0.157  // tan(3°) * 3 visual
-  const tan9 = 0.475  // tan(9°) * 3 visual
-  const tan15 = 0.804 // tan(15°) * 3 visual
-  const r2 = (n: number) => Number(n.toFixed(2))
-  const acX = r2(460 - progress * 360)
-  const falseY = r2(240 - (460 - acX) * tan9 / 3 * 3) // captures on 9°
-  // Aircraft starts above 9°, then captures
-  const captureT = 0.42
-  const acY =
-    progress < captureT
-      ? r2(40 + progress * 80) // descending freely
-      : falseY // captured by false path
+  // Aircraft animation:
+  //   t=0   → upper-right (just inside the diagram, well above 9°)
+  //   t=0.5 → captures the 9° false path
+  //   t=1   → reached antenna along 9° path
+  const captureT = 0.5
+  const startPoint = { left: 90, top: 10 }
+  const captureStart = pointOnPath(PATH_9_END, 0.85) // where it hits the 9° line
+  // Pre-capture: linear from startPoint → captureStart
+  // Post-capture: along 9° path from captureStart back toward antenna
+  const ac = (() => {
+    if (progress < captureT) {
+      const t = progress / captureT
+      return {
+        left: startPoint.left + t * (captureStart.left - startPoint.left),
+        top: startPoint.top + t * (captureStart.top - startPoint.top),
+      }
+    }
+    // After capture, ride the 9° false path toward antenna
+    const t = (progress - captureT) / (1 - captureT)
+    const captureT_onPath = 0.85
+    const targetT_onPath = 0.15 // close to antenna by the end
+    const pathT = captureT_onPath + t * (targetT_onPath - captureT_onPath)
+    return pointOnPath(PATH_9_END, pathT)
+  })()
 
-  const true3Y2 = r2(240 - 450 * tan3)
-  const false9Y2 = r2(240 - 450 * tan9)
-  const false9LabelY = r2(240 - 320 * tan9 - 8)
-  const false15Y2 = r2(240 - 320 * tan15)
-  const false15LabelY = r2(240 - 240 * tan15 - 8)
+  const path3 = pathGeometry(PATH_3_END)
+  const path9 = pathGeometry(PATH_9_END)
+  const path15 = pathGeometry(PATH_15_END)
+
+  // Label positions — sit along each path at a chosen fraction
+  const label3 = pointOnPath(PATH_3_END, 0.92)
+  const label9 = pointOnPath(PATH_9_END, 0.62)
+  const label15 = pointOnPath(PATH_15_END, 0.70)
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr]">
-        <div className="relative bg-[linear-gradient(to_bottom,#0a0e14_0%,#0e131b_100%)] p-6">
-          <svg viewBox="0 0 520 280" className="w-full h-auto">
-            {/* Ground */}
-            <line x1="0" y1="240" x2="520" y2="240" stroke="#2a3441" strokeWidth="0.8" />
-            <rect x="60" y="240" width="450" height="3" fill="#1a2029" stroke="#2a3441" />
+        {/* Diagram */}
+        <div className="relative aspect-[13/6] bg-[linear-gradient(to_bottom,#0a0e14_0%,#0e131b_100%)] overflow-hidden">
+          {/* Ground line */}
+          <div
+            className="absolute left-0 right-0 h-px bg-border"
+            style={{ top: `${ANTENNA.top}%` }}
+          />
+          {/* Runway strip */}
+          <div
+            className="absolute bg-bg-subtle border-y border-border"
+            style={{
+              left: `${ANTENNA.left}%`,
+              right: 0,
+              top: `${ANTENNA.top - 1}%`,
+              height: "2.5%",
+            }}
+          />
 
-            {/* GS antenna */}
-            <rect x="60" y="200" width="2.5" height="40" fill="#3b8bd4" opacity="0.85" />
+          {/* True 3° path — always visible, teal dashed */}
+          <div
+            className="absolute origin-left h-px"
+            style={{
+              left: `${ANTENNA.left}%`,
+              top: `${ANTENNA.top}%`,
+              width: `${path3.lenPct}%`,
+              transform: `rotate(${path3.angleDeg}deg)`,
+              transformOrigin: "left center",
+              backgroundImage:
+                "repeating-linear-gradient(to right, rgba(93,202,165,0.85) 0 5px, transparent 5px 9px)",
+              boxShadow: "0 0 6px rgba(93,202,165,0.35)",
+            }}
+          />
+          <div
+            className="absolute font-mono text-[9px] tracking-[0.12em] text-onpath font-semibold pointer-events-none"
+            style={{
+              left: `${label3.left}%`,
+              top: `${label3.top}%`,
+              transform: "translate(-100%, -130%)",
+            }}
+          >
+            3° · TRUE PATH
+          </div>
 
-            {/* True 3° path */}
-            <line
-              x1="60"
-              y1="240"
-              x2="510"
-              y2={true3Y2}
-              stroke="#5dcaa5"
-              strokeWidth="1.6"
-              strokeDasharray="4 3"
-            />
-            <text x="495" y="232" fontSize="9" fontFamily="var(--font-mono)" fill="#5dcaa5" textAnchor="end" letterSpacing="0.1em">3° · TRUE PATH</text>
-
-            <AnimatePresence>
-              {showFalse && (
-                <motion.g
+          {/* False 9° + 15° paths — toggled via AnimatePresence */}
+          <AnimatePresence>
+            {showFalse && (
+              <>
+                <motion.div
+                  key="p9"
+                  initial={{ opacity: 0, scaleX: 0 }}
+                  animate={{ opacity: 0.85, scaleX: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="absolute origin-left h-px"
+                  style={{
+                    left: `${ANTENNA.left}%`,
+                    top: `${ANTENNA.top}%`,
+                    width: `${path9.lenPct}%`,
+                    transform: `rotate(${path9.angleDeg}deg)`,
+                    transformOrigin: "left center",
+                    backgroundImage:
+                      "repeating-linear-gradient(to right, rgba(226,75,74,0.85) 0 4px, transparent 4px 7px)",
+                  }}
+                />
+                <motion.div
+                  key="l9"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.6 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="absolute font-mono text-[9px] tracking-[0.12em] text-danger pointer-events-none"
+                  style={{
+                    left: `${label9.left}%`,
+                    top: `${label9.top}%`,
+                    transform: "translate(-50%, -150%)",
+                  }}
                 >
-                  {/* 9° false path */}
-                  <line
-                    x1="60"
-                    y1="240"
-                    x2="510"
-                    y2={false9Y2}
-                    stroke="#e24b4a"
-                    strokeWidth="1.4"
-                    strokeDasharray="2 3"
-                    opacity="0.7"
-                  />
-                  <text x="380" y={false9LabelY} fontSize="9" fontFamily="var(--font-mono)" fill="#e24b4a" letterSpacing="0.1em">
-                    9° · FALSE PATH
-                  </text>
+                  9° · FALSE PATH
+                </motion.div>
 
-                  {/* 15° false path */}
-                  <line
-                    x1="60"
-                    y1="240"
-                    x2="380"
-                    y2={false15Y2}
-                    stroke="#e24b4a"
-                    strokeWidth="1"
-                    strokeDasharray="2 3"
-                    opacity="0.45"
-                  />
-                  <text x="300" y={false15LabelY} fontSize="9" fontFamily="var(--font-mono)" fill="#e24b4a" opacity="0.55" letterSpacing="0.1em">
-                    15° · FALSE PATH
-                  </text>
-                </motion.g>
-              )}
-            </AnimatePresence>
-
-            {/* Animated aircraft */}
-            {playing && (
-              <g transform={`translate(${acX}, ${acY})`}>
-                <circle r="13" fill="#e24b4a" fillOpacity="0.15">
-                  <animate attributeName="r" values="13;18;13" dur="0.8s" repeatCount="indefinite" />
-                </circle>
-                <path d="M -16 0 L 4 -2 L 4 -3 L 12 -3 L 12 3 L 4 3 L 4 2 L -16 0 Z" fill="#e24b4a" />
-                <path d="M -4 -8 L 2 0 L -4 8 Z" fill="#e24b4a" />
-              </g>
+                <motion.div
+                  key="p15"
+                  initial={{ opacity: 0, scaleX: 0 }}
+                  animate={{ opacity: 0.55, scaleX: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.6, delay: 0.15 }}
+                  className="absolute origin-left h-px"
+                  style={{
+                    left: `${ANTENNA.left}%`,
+                    top: `${ANTENNA.top}%`,
+                    width: `${path15.lenPct}%`,
+                    transform: `rotate(${path15.angleDeg}deg)`,
+                    transformOrigin: "left center",
+                    backgroundImage:
+                      "repeating-linear-gradient(to right, rgba(226,75,74,0.7) 0 3px, transparent 3px 6px)",
+                  }}
+                />
+                <motion.div
+                  key="l15"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.7 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5, delay: 0.45 }}
+                  className="absolute font-mono text-[9px] tracking-[0.12em] text-danger pointer-events-none"
+                  style={{
+                    left: `${label15.left}%`,
+                    top: `${label15.top}%`,
+                    transform: "translate(-50%, -150%)",
+                  }}
+                >
+                  15° · FALSE PATH
+                </motion.div>
+              </>
             )}
+          </AnimatePresence>
 
-            {/* Decision-height annotation */}
-            <text x="14" y="20" fontSize="9" fontFamily="var(--font-mono)" fill="#6b7785" letterSpacing="0.1em">↘ INTERCEPT FROM ABOVE</text>
-          </svg>
+          {/* GS antenna — anchored at ANTENNA */}
+          <div
+            className="absolute -translate-x-1/2 -translate-y-full"
+            style={{ left: `${ANTENNA.left}%`, top: `${ANTENNA.top}%` }}
+          >
+            <div className="relative h-10 w-px bg-gs mx-auto">
+              <span className="absolute left-1/2 -translate-x-1/2 top-1 h-1 w-5 bg-gs rounded-sm" />
+              <span className="absolute left-1/2 -translate-x-1/2 top-4 h-1 w-5 bg-gs rounded-sm" />
+              <span className="absolute left-1/2 -translate-x-1/2 top-7 h-1 w-5 bg-gs rounded-sm" />
+              <span className="absolute left-1/2 -translate-x-1/2 -top-1 h-1.5 w-1.5 rounded-full bg-gs" />
+            </div>
+          </div>
+
+          {/* Animated aircraft */}
+          {playing && (
+            <div
+              className="absolute -translate-x-1/2 -translate-y-1/2 z-10"
+              style={{ left: `${ac.left}%`, top: `${ac.top}%` }}
+            >
+              <div className="relative flex items-center justify-center">
+                <span className="absolute h-8 w-8 rounded-full bg-danger/15">
+                  <span className="block h-full w-full rounded-full bg-danger/15 animate-ping" />
+                </span>
+                <span className="relative text-[22px] leading-none text-danger" aria-hidden>
+                  ✈
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* "↘ INTERCEPT FROM ABOVE" annotation */}
+          <div className="absolute top-3 left-4 font-mono text-[9px] tracking-[0.15em] uppercase text-text-tertiary pointer-events-none">
+            ↘ INTERCEPT FROM ABOVE
+          </div>
         </div>
 
+        {/* Right column */}
         <div className="p-7 flex flex-col gap-5 bg-bg-subtle/40 border-t md:border-t-0 md:border-l border-border">
           <div>
-            <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase mb-2">The hazard</p>
+            <p className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase mb-2">
+              The hazard
+            </p>
             <p className="text-[14px] leading-relaxed text-foreground/85">
               The DDM = 0 condition repeats at multiples of the true angle. An aircraft intercepting from very high altitude can lock onto the 9° "path" — a descent so steep it is unrecoverable.
             </p>
@@ -162,7 +283,9 @@ export function FalsePath() {
           </div>
 
           <div className="pt-4 border-t border-border">
-            <p className="font-mono text-[10px] tracking-[0.2em] text-onpath uppercase mb-2">Procedure</p>
+            <p className="font-mono text-[10px] tracking-[0.2em] text-onpath uppercase mb-2">
+              Procedure
+            </p>
             <p className="text-[13px] leading-relaxed text-muted-foreground">
               Always intercept the ILS from <em className="text-foreground not-italic">below</em>. Establish on the localizer level, then wait for the glide slope needle to rise up through center before beginning descent.
             </p>

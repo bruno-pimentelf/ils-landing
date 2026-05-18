@@ -69,50 +69,8 @@ export function CaseStudy() {
                   ))}
                 </Stagger>
 
-                {/* Profile view inset — mini side profile */}
-                <div className="mt-10 rounded-md border border-border bg-bg-subtle/60 p-5">
-                  <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-text-tertiary mb-4">
-                    Profile view · published descent
-                  </p>
-                  <svg viewBox="0 0 700 130" className="w-full h-auto">
-                    {/* Ground */}
-                    <line x1="0" y1="100" x2="700" y2="100" stroke="#2a3441" strokeWidth="1" />
-                    {/* Path */}
-                    <line x1="640" y1="100" x2="40" y2="35" stroke="#5dcaa5" strokeWidth="1.4" strokeDasharray="3 4" opacity="0.85" />
-                    {/* Antenna */}
-                    <rect x="638" y="74" width="2" height="26" fill="#3b8bd4" />
-                    {[0, 1, 2].map((i) => (
-                      <rect key={i} x="633" y={78 + i * 7} width="12" height="2" fill="#3b8bd4" />
-                    ))}
-                    {/* Runway extension */}
-                    <rect x="640" y="100" width="60" height="3" fill="#1a2029" stroke="#2a3441" />
-                    {/* DH @ ~200ft */}
-                    <line x1="500" y1="92" x2="540" y2="92" stroke="#ef9f27" strokeWidth="1" strokeDasharray="3 3" />
-                    <text x="500" y="86" fontSize="9" fontFamily="var(--font-mono)" fill="#ef9f27">DH 200</text>
-                    {/* TCH */}
-                    <text x="640" y="118" fontSize="9" fontFamily="var(--font-mono)" fill="#9ba8b8" textAnchor="middle">TCH 56</text>
-                    {/* Distance fix annotations */}
-                    {[
-                      { x: 540, label: "FAF · 6.2 DME" },
-                      { x: 360, label: "10 DME" },
-                      { x: 180, label: "intercept" },
-                    ].map((m) => {
-                      const y = Number((100 - (640 - m.x) * (65 / 600)).toFixed(2))
-                      return (
-                        <g key={m.x}>
-                          <circle cx={m.x} cy={y} r="3" fill="#0a0e14" stroke="#5dcaa5" strokeWidth="1" />
-                          <text x={m.x} y={Number((y - 8).toFixed(2))} textAnchor="middle" fontSize="8.5" fontFamily="var(--font-mono)" fill="#9ba8b8">
-                            {m.label}
-                          </text>
-                        </g>
-                      )
-                    })}
-                    {/* Slope label */}
-                    <text x="40" y="55" fontSize="10" fontFamily="var(--font-mono)" fill="#5dcaa5" letterSpacing="0.1em">
-                      3.00° GS
-                    </text>
-                  </svg>
-                </div>
+                {/* Profile view inset — mini side profile (HTML/CSS, single anchor) */}
+                <CaseStudyProfile />
               </div>
             </div>
           </FadeIn>
@@ -156,5 +114,130 @@ export function CaseStudy() {
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * Mini profile-view inset for the KSFO 28L case study. Same single-source
+ * pattern: antenna + path-end constants; DME markers derive from pointOnPath.
+ */
+function CaseStudyProfile() {
+  const ANTENNA = { left: 92, top: 80 }
+  const PATH_END = { left: 5, top: 28 }
+
+  const pointOnPath = (t: number) => ({
+    left: ANTENNA.left + t * (PATH_END.left - ANTENNA.left),
+    top: ANTENNA.top + t * (PATH_END.top - ANTENNA.top),
+  })
+
+  // Rotated-div geometry for the dashed path line
+  const ASPECT = 700 / 130 // matches the previous SVG viewBox ratio
+  const dxPct = PATH_END.left - ANTENNA.left
+  const dyPct = PATH_END.top - ANTENNA.top
+  const angleDeg = Math.atan2(dyPct, dxPct * ASPECT) * (180 / Math.PI)
+  const lenPct = Math.sqrt(dxPct * dxPct + (dyPct / ASPECT) * (dyPct / ASPECT))
+
+  // DME markers along the path at chosen fractions
+  const markers = [
+    { t: 0.18, label: "FAF · 6.2 DME" },
+    { t: 0.43, label: "10 DME" },
+    { t: 0.68, label: "intercept" },
+  ]
+
+  // DH bar sits along the path at ~92% of the way toward antenna
+  const dhPoint = pointOnPath(0.92)
+
+  return (
+    <div className="mt-10 rounded-md border border-border bg-bg-subtle/60 p-5">
+      <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-text-tertiary mb-4">
+        Profile view · published descent
+      </p>
+      <div className="relative w-full aspect-[700/130] bg-bg-base/40 rounded-sm overflow-hidden">
+        {/* Ground line */}
+        <div
+          className="absolute left-0 right-0 h-px bg-border"
+          style={{ top: `${ANTENNA.top}%` }}
+        />
+        {/* Runway extension behind antenna */}
+        <div
+          className="absolute bg-bg-subtle border-y border-border"
+          style={{
+            left: `${ANTENNA.left}%`,
+            right: 0,
+            top: `${ANTENNA.top - 1.5}%`,
+            height: "3%",
+          }}
+        />
+
+        {/* Dashed glide path */}
+        <div
+          className="absolute origin-left h-px"
+          style={{
+            left: `${ANTENNA.left}%`,
+            top: `${ANTENNA.top}%`,
+            width: `${lenPct}%`,
+            transform: `rotate(${angleDeg}deg)`,
+            transformOrigin: "left center",
+            backgroundImage:
+              "repeating-linear-gradient(to right, rgba(93,202,165,0.85) 0 4px, transparent 4px 7px)",
+          }}
+        />
+
+        {/* GS antenna */}
+        <div
+          className="absolute -translate-x-1/2 -translate-y-full"
+          style={{ left: `${ANTENNA.left}%`, top: `${ANTENNA.top}%` }}
+        >
+          <div className="relative h-7 w-px bg-gs mx-auto">
+            <span className="absolute left-1/2 -translate-x-1/2 top-1 h-[3px] w-3.5 bg-gs rounded-sm" />
+            <span className="absolute left-1/2 -translate-x-1/2 top-3 h-[3px] w-3.5 bg-gs rounded-sm" />
+            <span className="absolute left-1/2 -translate-x-1/2 top-5 h-[3px] w-3.5 bg-gs rounded-sm" />
+          </div>
+        </div>
+
+        {/* DME markers — circles ON the path */}
+        {markers.map((m) => {
+          const p = pointOnPath(m.t)
+          return (
+            <div
+              key={m.label}
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none"
+              style={{ left: `${p.left}%`, top: `${p.top}%` }}
+            >
+              <span className="font-mono text-[8.5px] text-text-secondary whitespace-nowrap">
+                {m.label}
+              </span>
+              <span className="mt-1 block h-1.5 w-1.5 rounded-full bg-bg-base ring-1 ring-onpath" />
+            </div>
+          )
+        })}
+
+        {/* DH bar — small dashed segment near the runway */}
+        <div
+          className="absolute -translate-x-1/2 flex flex-col items-center pointer-events-none"
+          style={{ left: `${dhPoint.left}%`, top: `${dhPoint.top - 6}%` }}
+        >
+          <span className="font-mono text-[8.5px] text-loc">DH 200</span>
+          <span className="mt-0.5 h-px w-12 bg-loc/70" style={{
+            backgroundImage:
+              "repeating-linear-gradient(to right, rgba(239,159,39,0.85) 0 3px, transparent 3px 6px)",
+            backgroundColor: "transparent",
+          }} />
+        </div>
+
+        {/* TCH label near antenna */}
+        <span
+          className="absolute font-mono text-[8.5px] text-text-secondary pointer-events-none"
+          style={{ left: `${ANTENNA.left}%`, top: `${ANTENNA.top + 5}%`, transform: "translateX(-50%)" }}
+        >
+          TCH 56
+        </span>
+
+        {/* Slope label upper-left */}
+        <span className="absolute top-3 left-3 font-mono text-[10px] tracking-[0.1em] text-onpath font-semibold">
+          3.00° GS
+        </span>
+      </div>
+    </div>
   )
 }
