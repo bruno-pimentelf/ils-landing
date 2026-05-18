@@ -49,16 +49,20 @@ export function TopDownView() {
       </motion.div>
 
       {/* Localizer beam fan — amber, brightest AT the antenna (right) fading
-          out to the left. Apex sits exactly at the antenna's x position. */}
+          out to the left. Apex sits exactly at the antenna's x position,
+          centered vertically with the runway. Note: we don't use translateY
+          to center because Framer Motion's animate state overrides inline
+          transforms — use top/bottom anchors instead. */}
       <motion.div
         initial={{ opacity: 0, scaleX: 0 }}
         animate={inView ? { opacity: 1, scaleX: 1 } : {}}
         transition={{ duration: 1.2, delay: 0.6, ease: [0.32, 0.72, 0, 1] }}
-        className="absolute top-1/2 right-[7%] origin-right"
+        className="absolute origin-right"
         style={{
+          right: "7%",
+          top: "20%",
+          bottom: "20%",
           width: "70%",
-          height: "60%",
-          transform: "translateY(-50%)",
           clipPath: "polygon(100% 50%, 0% 0%, 0% 100%)",
           background:
             "linear-gradient(to left, rgba(239,159,39,0.30) 0%, rgba(239,159,39,0) 100%)",
